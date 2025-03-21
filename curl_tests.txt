@@ -1,0 +1,191 @@
+Yes! Now that all your APIs are working, here’s the **full list of `cURL` commands** for testing each and every one of them. 🚀  
+
+---
+
+# **📌 1️⃣ User Authentication APIs**
+### ✅ **Register a New User**
+```bash
+curl -X POST http://localhost:5000/api/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"name":"John Doe","email":"johndoe@example.com","password":"123456"}'
+```
+✔ **Response:**  
+```json
+{
+  "message": "User registered successfully",
+  "user": { "ok": true, "id": "user:123456", "rev": "1-abc123" }
+}
+```
+
+---
+
+### ✅ **Login and Get JWT Token**
+```bash
+curl -X POST http://localhost:5000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email":"johndoe@example.com","password":"123456"}'
+```
+✔ **Response:**  
+```json
+{
+  "token": "YOUR_JWT_TOKEN"
+}
+```
+🚀 **Copy the token** and replace `"YOUR_JWT_TOKEN"` in the following requests.
+
+---
+
+# **📌 2️⃣ User Management APIs**
+### ✅ **Get All Users (Admin Only)**
+```bash
+curl -X GET http://localhost:5000/api/users/ \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+---
+
+### ✅ **Block/Unblock a User (Admin Only)**
+```bash
+curl -X PUT http://localhost:5000/api/users/admin/block-user/user:123456 \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"is_blocked": 1}'
+```
+✔ **Response:**  
+```json
+{
+  "message": "User user:123456 has been blocked"
+}
+```
+
+---
+
+# **📌 3️⃣ Channel APIs**
+### ✅ **Create a Channel**
+```bash
+curl -X POST http://localhost:5000/api/channels/ \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"name": "React Development"}'
+```
+
+---
+
+### ✅ **Get All Channels**
+```bash
+curl -X GET http://localhost:5000/api/channels/ \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+---
+
+# **📌 4️⃣ Message APIs**
+### ✅ **Post a Message (Without Image)**
+```bash
+curl -X POST http://localhost:5000/api/messages/ \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"channel_id": "channel:001", "content": "How do I use useEffect in React?"}'
+```
+
+---
+
+### ✅ **Post a Message (With Image)**
+```bash
+curl -X POST http://localhost:5000/api/messages/ \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -F "channel_id=channel:001" \
+     -F "content=How do I use useEffect in React?" \
+     -F "image=@/c/users/godyr/downloads/example.jpg"
+```
+
+---
+
+### ✅ **Get a Single Message (With Attachments)**
+```bash
+curl -X GET http://localhost:5000/api/messages/message:1742547221197 \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+---
+
+### ✅ **Get All Messages (With Nested Replies)**
+```bash
+curl -X GET http://localhost:5000/api/messages/ \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+---
+
+# **📌 5️⃣ Reply APIs**
+### ✅ **Reply to a Message**
+```bash
+curl -X POST http://localhost:5000/api/replies/ \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"parent_id": "message:1742547221197", "content": "Use useEffect like this: useEffect(() => { ... }, [])"}'
+```
+
+---
+
+### ✅ **Reply to a Reply (Nested Reply)**
+```bash
+curl -X POST http://localhost:5000/api/replies/ \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"parent_id": "reply:1742549172827", "content": "Thanks for the explanation!"}'
+```
+
+---
+
+### ✅ **Get a Single Reply (With Attachments)**
+```bash
+curl -X GET http://localhost:5000/api/replies/reply:1742549172827 \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+---
+
+# **📌 6️⃣ Delete APIs (Admin Only)**
+### ✅ **Delete a Message**
+```bash
+curl -X DELETE http://localhost:5000/api/messages/message:1742547221197 \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+---
+
+### ✅ **Delete a Reply**
+```bash
+curl -X DELETE http://localhost:5000/api/replies/reply:1742549172827 \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+---
+
+# **📌 Summary of All APIs**
+| **API**                            | **Method** | **Endpoint**                        |
+|-------------------------------------|-----------|-------------------------------------|
+| **Register a user**                 | `POST`    | `/api/auth/register`               |
+| **Login a user**                    | `POST`    | `/api/auth/login`                  |
+| **Get all users (Admin only)**      | `GET`     | `/api/users/`                      |
+| **Block/Unblock a user (Admin)**    | `PUT`     | `/api/users/admin/block-user/:id`  |
+| **Create a channel**                | `POST`    | `/api/channels/`                   |
+| **Get all channels**                | `GET`     | `/api/channels/`                   |
+| **Post a message**                  | `POST`    | `/api/messages/`                   |
+| **Get a message by ID**             | `GET`     | `/api/messages/:message_id`        |
+| **Get all messages (with replies)** | `GET`     | `/api/messages/`                   |
+| **Reply to a message**              | `POST`    | `/api/replies/`                    |
+| **Reply to a reply (nested)**       | `POST`    | `/api/replies/`                    |
+| **Get a reply by ID**               | `GET`     | `/api/replies/:reply_id`           |
+| **Delete a message (Admin)**        | `DELETE`  | `/api/messages/:message_id`        |
+| **Delete a reply (Admin)**          | `DELETE`  | `/api/replies/:reply_id`           |
+
+---
+
+## **📌 Final Steps**
+✅ **Replace `"YOUR_JWT_TOKEN"` with your actual token.**  
+✅ **Run each cURL command one by one to test the APIs.**  
+✅ **If you get any errors, paste them here, and I’ll debug them for you!**  
+
+🚀 **Now, go ahead and test all the APIs!** 🎉🔥

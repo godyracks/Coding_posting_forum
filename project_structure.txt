@@ -1,0 +1,28 @@
+project-root/
+├── backend/        # Node.js backend (CouchDB)
+│   ├── config/     # Database connection
+│   │   ├── db.js
+│   ├── controllers/ # Business logic
+│   │   ├── authController.js
+│   │   ├── userController.js
+│   │   ├── messageController.js
+│   │   ├── channelController.js
+│   ├── routes/     # API endpoints
+│   │   ├── authRoutes.js
+│   │   ├── userRoutes.js
+│   │   ├── messageRoutes.js
+│   │   ├── channelRoutes.js
+│   ├── middleware/ # Middleware (auth, block check)
+│   │   ├── authMiddleware.js
+│   ├── app.js      # Main server file
+│   ├── package.json
+├── frontend/       # React.js frontend (to be implemented)
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── App.js
+│   │   ├── index.js
+│   ├── package.json
+├── docker-compose.yml # Containerization
+├── README.md
