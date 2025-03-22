@@ -24,22 +24,27 @@ class Message {
         }
     }
 
-    static async replyToMessage({ message_id, user_id, content }) {
+    static async replyToMessage({ message_id, user_id, content, parent_id }) {
         try {
-            const replyDoc = {
-                _id: `reply:${Date.now()}`,
-                type: "reply",
-                message_id,
-                user_id,
-                content,
-                created_at: new Date().toISOString()
-            };
-            return await db.messages.insert(replyDoc);
+          const replyDoc = {
+            _id: `reply:${Date.now()}`,
+            type: "reply",
+            message_id,
+            parent_id, // ✅ Ensure parent_id is included
+            user_id,
+            content,
+            created_at: new Date().toISOString(),
+            likes: { up: 0, down: 0 } // ✅ Ensure likes are included in the database
+          };
+          return await db.messages.insert(replyDoc);
         } catch (error) {
-            console.error('Error adding reply:', error);
-            return null;
+          console.error('Error adding reply:', error);
+          return null;
         }
-    }
+      }
+    
+    
+    
 }
 
 module.exports = Message;
