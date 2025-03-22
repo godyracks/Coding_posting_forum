@@ -108,45 +108,66 @@ export default function Thread() {
   const renderReplies = (replies, parentId = messageId, level = 0) => {
     return replies
       .filter((reply) => reply.parent_id === parentId) // Filter replies for the current parent
-      .map((reply) => (
-        <div key={reply._id} style={{ marginLeft: `${level * 20}px` }} className="mt-2">
-          <div className="border-l-4 border-gray-400 pl-4 bg-gray-100 p-3 rounded-md">
-            <p className="text-gray-800">{reply.content}</p>
-            <p className="text-gray-500 text-sm">
-              🕒 {new Date(reply.created_at).toLocaleString()}
-            </p>
+      .map((reply) => {
+        // Count the number of nested replies
+        const nestedRepliesCount = replies.filter(
+          (r) => r.parent_id === reply._id
+        ).length;
 
-            {/* Reply to Reply Button */}
-            <button
-              onClick={() => setReplyingTo(reply._id)} // Set the reply being replied to
-              className="text-blue-500 text-sm mt-2 hover:underline"
-            >
-              💬 Reply
-            </button>
+        return (
+          <div key={reply._id} style={{ marginLeft: `${level * 20}px` }} className="mt-2">
+            <div className="border-l-4 border-gray-400 pl-4 bg-gray-100 p-3 rounded-md">
+              {/* Reply Content */}
+              <p className="text-gray-800">{reply.content}</p>
+              <p className="text-gray-500 text-sm">
+                🕒 {new Date(reply.created_at).toLocaleString()}
+              </p>
 
-            {/* Nested Reply Form */}
-            {replyingTo === reply._id && (
-              <div className="mt-4">
-                <textarea
-                  className="w-full border border-gray-300 p-2 rounded-md"
-                  placeholder="Type your reply..."
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                ></textarea>
-                <button
-                  onClick={() => handleReply(reply._id)} // Pass the reply ID as parent_id
-                  className="mt-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
-                >
-                  Reply
-                </button>
+              {/* Like/Dislike Buttons */}
+              <div className="flex mt-2 space-x-4">
+                <button className="text-green-600">👍 {reply.likes?.up || 0}</button>
+                <button className="text-red-600">👎 {reply.likes?.down || 0}</button>
               </div>
-            )}
 
-            {/* Recursively render nested replies */}
-            {renderReplies(replies, reply._id, level + 1)}
+              {/* Reply to Reply Button */}
+              <button
+                onClick={() => setReplyingTo(reply._id)} // Set the reply being replied to
+                className="text-blue-500 text-sm mt-2 hover:underline"
+              >
+                💬 Reply
+              </button>
+
+              {/* Nested Reply Form */}
+              {replyingTo === reply._id && (
+                <div className="mt-4">
+                  <textarea
+                    className="w-full border border-gray-300 p-2 rounded-md"
+                    placeholder="Type your reply..."
+                    value={replyContent}
+                    onChange={(e) => setReplyContent(e.target.value)}
+                  ></textarea>
+                  <button
+                    onClick={() => handleReply(reply._id)} // Pass the reply ID as parent_id
+                    className="mt-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
+                  >
+                    Reply
+                  </button>
+                </div>
+              )}
+
+              {/* Nested Replies Count */}
+              {nestedRepliesCount > 0 && (
+                <p className="text-gray-500 text-sm mt-2">
+                  💬 {nestedRepliesCount} {nestedRepliesCount === 1 ? "reply" : "replies"}
+                </p>
+              )}
+
+              {/* Recursively render nested replies */}
+              {renderReplies(replies, reply._id, level + 1)}
+            </div>
           </div>
-        </div>
-      ));
+        );
+      });
   };
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
