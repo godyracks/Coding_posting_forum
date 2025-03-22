@@ -28,8 +28,23 @@ export default function Thread() {
           return;
         }
 
+        // Flatten the nested replies structure
+        const flattenReplies = (replies) => {
+          let flatReplies = [];
+          replies.forEach((reply) => {
+            flatReplies.push(reply); // Add the current reply
+            if (reply.replies && reply.replies.length > 0) {
+              flatReplies = flatReplies.concat(flattenReplies(reply.replies)); // Recursively flatten nested replies
+            }
+          });
+          return flatReplies;
+        };
+
+        // Flatten the replies array
+        const updatedReplies = flattenReplies(message.replies || []);
+
         // Ensure all replies have a `likes` object
-        const updatedReplies = (message.replies || []).map((reply) => ({
+        const repliesWithLikes = updatedReplies.map((reply) => ({
           ...reply,
           likes: reply.likes || { up: 0, down: 0 },
         }));
@@ -37,7 +52,7 @@ export default function Thread() {
         // Update state with the message and its replies
         setThread({
           ...message,
-          replies: updatedReplies,
+          replies: repliesWithLikes,
         });
 
         setLoading(false);
@@ -89,6 +104,51 @@ export default function Thread() {
     }
   };
 
+  // Recursive function to render replies with proper indentation
+  const renderReplies = (replies, parentId = messageId, level = 0) => {
+    return replies
+      .filter((reply) => reply.parent_id === parentId) // Filter replies for the current parent
+      .map((reply) => (
+        <div key={reply._id} style={{ marginLeft: `${level * 20}px` }} className="mt-2">
+          <div className="border-l-4 border-gray-400 pl-4 bg-gray-100 p-3 rounded-md">
+            <p className="text-gray-800">{reply.content}</p>
+            <p className="text-gray-500 text-sm">
+              🕒 {new Date(reply.created_at).toLocaleString()}
+            </p>
+
+            {/* Reply to Reply Button */}
+            <button
+              onClick={() => setReplyingTo(reply._id)} // Set the reply being replied to
+              className="text-blue-500 text-sm mt-2 hover:underline"
+            >
+              💬 Reply
+            </button>
+
+            {/* Nested Reply Form */}
+            {replyingTo === reply._id && (
+              <div className="mt-4">
+                <textarea
+                  className="w-full border border-gray-300 p-2 rounded-md"
+                  placeholder="Type your reply..."
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                ></textarea>
+                <button
+                  onClick={() => handleReply(reply._id)} // Pass the reply ID as parent_id
+                  className="mt-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
+                >
+                  Reply
+                </button>
+              </div>
+            )}
+
+            {/* Recursively render nested replies */}
+            {renderReplies(replies, reply._id, level + 1)}
+          </div>
+        </div>
+      ));
+  };
+
   if (loading) return <p className="text-center mt-10">Loading...</p>;
 
   if (!thread) return <p className="text-center mt-10 text-red-500">Message not found.</p>;
@@ -120,43 +180,7 @@ export default function Thread() {
         <h2 className="text-lg font-semibold mb-2">Replies:</h2>
 
         {thread.replies && thread.replies.length > 0 ? (
-          thread.replies.map((reply) => (
-            <div
-              key={reply._id}
-              className="ml-6 border-l-4 border-gray-400 pl-4 mt-2 bg-gray-100 p-3 rounded-md"
-            >
-              <p className="text-gray-800">{reply.content}</p>
-              <p className="text-gray-500 text-sm">
-                🕒 {new Date(reply.created_at).toLocaleString()}
-              </p>
-
-              {/* Reply to Reply Button */}
-              <button
-                onClick={() => setReplyingTo(reply._id)} // Set the reply being replied to
-                className="text-blue-500 text-sm mt-2 hover:underline"
-              >
-                💬 Reply
-              </button>
-
-              {/* Nested Reply Form */}
-              {replyingTo === reply._id && (
-                <div className="mt-4">
-                  <textarea
-                    className="w-full border border-gray-300 p-2 rounded-md"
-                    placeholder="Type your reply..."
-                    value={replyContent}
-                    onChange={(e) => setReplyContent(e.target.value)}
-                  ></textarea>
-                  <button
-                    onClick={() => handleReply(reply._id)} // Pass the reply ID as parent_id
-                    className="mt-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
-                  >
-                    Reply
-                  </button>
-                </div>
-              )}
-            </div>
-          ))
+          renderReplies(thread.replies) // Render replies recursively
         ) : (
           <p className="text-gray-500">No replies yet. Be the first to reply!</p>
         )}
