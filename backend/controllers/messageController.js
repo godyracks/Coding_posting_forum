@@ -92,3 +92,41 @@ exports.getAllMessages = async (req, res) => {
         res.status(500).json({ error: "Error fetching messages" });
     }
 };
+
+// Like a message or reply
+exports.likeMessage = async (req, res) => {
+    try {
+      const { message_id } = req.params;
+      const message = await db.get(message_id);
+  
+      // Increment the likes.up count
+      message.likes.up = (message.likes.up || 0) + 1;
+  
+      // Update the message in the database
+      await db.insert(message);
+  
+      res.status(200).json({ message: "Message liked successfully!", likes: message.likes });
+    } catch (error) {
+      console.error("❌ Error liking message:", error.message);
+      res.status(500).json({ error: "Error liking message", details: error.message });
+    }
+  };
+  
+  // Dislike a message or reply
+  exports.dislikeMessage = async (req, res) => {
+    try {
+      const { message_id } = req.params;
+      const message = await db.get(message_id);
+  
+      // Increment the likes.down count
+      message.likes.down = (message.likes.down || 0) + 1;
+  
+      // Update the message in the database
+      await db.insert(message);
+  
+      res.status(200).json({ message: "Message disliked successfully!", likes: message.likes });
+    } catch (error) {
+      console.error("❌ Error disliking message:", error.message);
+      res.status(500).json({ error: "Error disliking message", details: error.message });
+    }
+  };
