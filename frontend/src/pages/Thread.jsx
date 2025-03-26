@@ -8,7 +8,8 @@ import {
   MessageSquareReply, 
   Clock,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Camera
 } from "lucide-react";
 
 export default function Thread() {
@@ -182,13 +183,19 @@ export default function Thread() {
 
               {/* Nested Reply Form */}
               {replyingTo === reply._id && (
-                <div className="mt-4 space-y-2">
-                  <textarea
-                    className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-200 transition-all"
-                    placeholder="Type your reply..."
-                    value={replyContent}
-                    onChange={(e) => setReplyContent(e.target.value)}
-                  ></textarea>
+                <div className="mt-4 space-y-2 relative">
+                  <div className="relative">
+                    <textarea
+                      className="w-full border border-gray-300 p-2 pl-10 rounded-md focus:ring-2 focus:ring-blue-200 transition-all"
+                      placeholder="Type your reply..."
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                    ></textarea>
+                    <Camera 
+                      className="absolute left-3 top-3 text-gray-400" 
+                      size={20} 
+                    />
+                  </div>
                   <button
                     onClick={() => handleReply(reply._id)}
                     className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
@@ -263,12 +270,18 @@ export default function Thread() {
       {/* Main Reply Form */}
       <div className="mt-6 pt-4 border-t border-gray-200">
         <h2 className="text-lg font-semibold mb-4 text-gray-700">Add a Reply</h2>
-        <textarea
-          className="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-blue-200 transition-all mb-3"
-          placeholder="Type your reply..."
-          value={replyContent}
-          onChange={(e) => setReplyContent(e.target.value)}
-        ></textarea>
+        <div className="relative">
+          <textarea
+            className="w-full border border-gray-300 p-3 pl-10 rounded-md focus:ring-2 focus:ring-blue-200 transition-all mb-3"
+            placeholder="Type your reply..."
+            value={replyContent}
+            onChange={(e) => setReplyContent(e.target.value)}
+          ></textarea>
+          <Camera 
+            className="absolute left-3 top-3 text-gray-400" 
+            size={20} 
+          />
+        </div>
         <button
           onClick={() => handleReply(messageId)}
           className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"

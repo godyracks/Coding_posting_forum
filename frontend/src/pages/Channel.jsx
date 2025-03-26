@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
+import { likeMessage, dislikeMessage } from '../services/likeService';
 import { 
   Send, 
   ArrowLeft, 
@@ -8,8 +9,40 @@ import {
   ThumbsUp, 
   ThumbsDown, 
   User, 
-  Clock 
+  Clock,
+  Camera 
 } from "lucide-react";
+
+
+  // Updated like handler
+  const handleLike = async (messageId) => {
+    try {
+      const updatedLikes = await likeMessage(messageId);
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg._id === messageId ? { ...msg, likes: updatedLikes } : msg
+        )
+      );
+    } catch (error) {
+      console.error('Failed to like message:', error);
+      // Optional: Show error to user
+    }
+  };
+
+// Updated dislike handler
+const handleDislike = async (messageId) => {
+  try {
+    const updatedLikes = await dislikeMessage(messageId);
+    setMessages(prevMessages => 
+      prevMessages.map(msg => 
+        msg._id === messageId ? { ...msg, likes: updatedLikes } : msg
+      )
+    );
+  } catch (error) {
+    console.error('Failed to dislike message:', error);
+    // Optional: Show error to user
+  }
+};
 
 // Redesigned New Post Input Component
 const NewPostInput = ({ newMessage, setNewMessage, onPost }) => {
@@ -19,16 +52,22 @@ const NewPostInput = ({ newMessage, setNewMessage, onPost }) => {
         <User className="text-gray-600" />
       </div>
       <div className="flex-1 flex items-center space-x-2">
-        <input 
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Write a new post..."
-          className="flex-1 p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <div className="relative flex-1">
+          <input 
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Write a new post..."
+            className="w-full p-3 pl-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <Camera 
+            size={20} 
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
+          />
+        </div>
         <button 
           onClick={onPost} 
-          className="bg-black text-black p-3 rounded-full hover:bg-gray-800 transition-colors "
+          className="bg-black text-white p-3 rounded-full hover:bg-gray-800 transition-colors"
         >
           <Send size={20} />
         </button>
@@ -164,13 +203,19 @@ export default function Channel() {
                 </div>
                 <div className="flex justify-between items-center text-sm text-gray-500 mt-auto">
                   <div className="flex space-x-4">
-                    <button className="flex items-center space-x-1 text-green-600 hover:text-green-700">
+                  <button 
+                      onClick={() => handleLike(msg._id)}
+                      className="flex items-center space-x-1 text-green-600 hover:text-green-700"
+                    >
                       <ThumbsUp size={16} />
-                      <span>{msg.likes.up}</span>
+                      <span>{msg.likes?.up || 0}</span>
                     </button>
-                    <button className="flex items-center space-x-1 text-red-600 hover:text-red-700">
+                    <button 
+                      onClick={() => handleDislike(msg._id)}
+                      className="flex items-center space-x-1 text-red-600 hover:text-red-700"
+                    >
                       <ThumbsDown size={16} />
-                      <span>{msg.likes.down}</span>
+                      <span>{msg.likes?.down || 0}</span>
                     </button>
                   </div>
                   <Link 
