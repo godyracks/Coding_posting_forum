@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
-import { likeMessage, dislikeMessage } from '../services/likeService';
+import { likeMessage, dislikeMessage } from "../services/likeService";
 import { 
   Send, 
   ArrowLeft, 
@@ -12,90 +12,6 @@ import {
   Clock,
   Camera 
 } from "lucide-react";
-
-
-  // Updated like handler
-  const handleLike = async (messageId) => {
-    try {
-      const updatedLikes = await likeMessage(messageId);
-      setMessages(prevMessages => 
-        prevMessages.map(msg => 
-          msg._id === messageId ? { ...msg, likes: updatedLikes } : msg
-        )
-      );
-    } catch (error) {
-      console.error('Failed to like message:', error);
-      // Optional: Show error to user
-    }
-  };
-
-// Updated dislike handler
-const handleDislike = async (messageId) => {
-  try {
-    const updatedLikes = await dislikeMessage(messageId);
-    setMessages(prevMessages => 
-      prevMessages.map(msg => 
-        msg._id === messageId ? { ...msg, likes: updatedLikes } : msg
-      )
-    );
-  } catch (error) {
-    console.error('Failed to dislike message:', error);
-    // Optional: Show error to user
-  }
-};
-
-// Redesigned New Post Input Component
-const NewPostInput = ({ newMessage, setNewMessage, onPost }) => {
-  return (
-    <div className="bg-white p-4 border-b border-gray-300 shadow-md flex items-center space-x-4">
-      <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
-        <User className="text-gray-600" />
-      </div>
-      <div className="flex-1 flex items-center space-x-2">
-        <div className="relative flex-1">
-          <input 
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Write a new post..."
-            className="w-full p-3 pl-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <Camera 
-            size={20} 
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
-          />
-        </div>
-        <button 
-          onClick={onPost} 
-          className="bg-black text-white p-3 rounded-full hover:bg-gray-800 transition-colors"
-        >
-          <Send size={20} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// Redesigned Channel Navigation Buttons
-const ChannelNavigationButtons = ({ channels, currentChannelId }) => {
-  return (
-    <div className="flex justify-center gap-4 p-14 bg-gray border-b border-gray-300 overflow-x-auto">
-      {channels.map(channel => (
-        <Link key={channel._id} to={`/channel/${channel._id}`}>
-          <button className={`
-            px-4 py-2 rounded-full font-medium transition-all duration-300 
-            ${currentChannelId === channel._id 
-              ? "bg-blue-600 text-blue" 
-              : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            }`}
-          >
-            {channel.name}
-          </button>
-        </Link>
-      ))}
-    </div>
-  );
-};
 
 export default function Channel() {
   const { channelId } = useParams();
@@ -115,17 +31,49 @@ export default function Channel() {
 
   useEffect(() => {
     if (channelId) {
-      axios.get("http://localhost:5000/api/messages/", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const filteredMessages = res.data.filter(msg => msg.channel_id === channelId);
-        setMessages(filteredMessages);
-        setSelectedChannel(channels.find(c => c._id === channelId) || null);
-      })
-      .catch((err) => console.error("Error fetching messages:", err));
+      fetchMessages();
     }
   }, [channelId, channels]);
+
+  const fetchMessages = () => {
+    axios.get("http://localhost:5000/api/messages/", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    .then((res) => {
+      const filteredMessages = res.data.filter(msg => msg.channel_id === channelId);
+      setMessages(filteredMessages);
+      setSelectedChannel(channels.find(c => c._id === channelId) || null);
+    })
+    .catch((err) => console.error("Error fetching messages:", err));
+  };
+
+  // Updated like handler with direct state update
+  const handleLike = async (messageId) => {
+    try {
+      await likeMessage(messageId);
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg._id === messageId ? { ...msg, likes: { ...msg.likes, up: (msg.likes.up || 0) + 1 } } : msg
+        )
+      );
+    } catch (error) {
+      console.error("Failed to like message:", error);
+    }
+  };
+
+  // Updated dislike handler with direct state update
+  const handleDislike = async (messageId) => {
+    try {
+      await dislikeMessage(messageId);
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg._id === messageId ? { ...msg, likes: { ...msg.likes, down: (msg.likes.down || 0) + 1 } } : msg
+        )
+      );
+    } catch (error) {
+      console.error("Failed to dislike message:", error);
+    }
+  };
 
   const handleNewPost = () => {
     if (!newMessage.trim()) return;
@@ -164,20 +112,32 @@ export default function Channel() {
         </h1>
       </div>
 
-      {/* New Post Input Component */}
-      <NewPostInput 
-        newMessage={newMessage} 
-        setNewMessage={setNewMessage} 
-        onPost={handleNewPost} 
-      />
+      {/* New Post Input */}
+      <div className="bg-white p-4 border-b border-gray-300 shadow-md flex items-center space-x-4">
+        <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
+          <User className="text-gray-600" />
+        </div>
+        <div className="flex-1 flex items-center space-x-2">
+          <div className="relative flex-1">
+            <input 
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Write a new post..."
+              className="w-full p-3 pl-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <Camera size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          </div>
+          <button 
+            onClick={handleNewPost} 
+            className="bg-black text-white p-3 rounded-full hover:bg-gray-800 transition-colors"
+          >
+            <Send size={20} />
+          </button>
+        </div>
+      </div>
 
-      {/* Channel Navigation Buttons Component */}
-      <ChannelNavigationButtons 
-        channels={channels} 
-        currentChannelId={channelId} 
-      />
-
-      {/* Messages Container */}
+      {/* Messages List */}
       <div className="flex-1 p-4">
         {messages.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6 max-w-6xl mx-auto">
@@ -199,29 +159,20 @@ export default function Channel() {
                       </p>
                     </div>
                   </div>
-                  <p className="text-gray-900 mb-4 line-clamp-3">{msg.content}</p>
+                  <p className="text-gray-900 mb-4">{msg.content}</p>
                 </div>
                 <div className="flex justify-between items-center text-sm text-gray-500 mt-auto">
                   <div className="flex space-x-4">
-                  <button 
-                      onClick={() => handleLike(msg._id)}
-                      className="flex items-center space-x-1 text-green-600 hover:text-green-700"
-                    >
+                    <button onClick={() => handleLike(msg._id)} className="flex items-center space-x-1 text-green-600 hover:text-green-700">
                       <ThumbsUp size={16} />
                       <span>{msg.likes?.up || 0}</span>
                     </button>
-                    <button 
-                      onClick={() => handleDislike(msg._id)}
-                      className="flex items-center space-x-1 text-red-600 hover:text-red-700"
-                    >
+                    <button onClick={() => handleDislike(msg._id)} className="flex items-center space-x-1 text-red-600 hover:text-red-700">
                       <ThumbsDown size={16} />
                       <span>{msg.likes?.down || 0}</span>
                     </button>
                   </div>
-                  <Link 
-                    to={`/thread/${msg._id}`} 
-                    className="flex items-center space-x-1 text-blue-500 hover:text-blue-600"
-                  >
+                  <Link to={`/thread/${msg._id}`} className="flex items-center space-x-1 text-blue-500 hover:text-blue-600">
                     <MessageCircle size={16} />
                     <span>{msg.replies.length} Replies</span>
                   </Link>

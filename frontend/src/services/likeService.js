@@ -14,11 +14,11 @@ export const likeMessage = async (messageId) => {
         }
       }
     );
-    return response.data.likes;
+    return response.data;
   } catch (error) {
     if (error.response?.status === 400) {
       // User already liked/disliked
-      return error.response.data.likes;
+      return error.response.data;
     }
     console.error('Like error:', error);
     throw error;
@@ -37,7 +37,7 @@ export const dislikeMessage = async (messageId) => {
         }
       }
     );
-    return response.data.likes;
+    return response.data;
   } catch (error) {
     if (error.response?.status === 400) {
       // User already liked/disliked
