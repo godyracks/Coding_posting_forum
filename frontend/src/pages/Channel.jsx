@@ -35,45 +35,89 @@ export default function Channel() {
     }
   }, [channelId, channels]);
 
-  const fetchMessages = () => {
-    axios.get("http://localhost:5000/api/messages/", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    .then((res) => {
-      const filteredMessages = res.data.filter(msg => msg.channel_id === channelId);
-      setMessages(filteredMessages);
-      setSelectedChannel(channels.find(c => c._id === channelId) || null);
-    })
-    .catch((err) => console.error("Error fetching messages:", err));
+  const fetchMessages = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/messages/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+  
+      const updatedMessages = res.data.map((msg) => ({
+        ...msg,
+        userLiked: msg.likedUsers?.includes(userId) || false,
+        userDisliked: msg.dislikedUsers?.includes(userId) || false,
+      }));
+  
+      setMessages(updatedMessages);
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+    }
   };
+  
+  
 
-  // Updated like handler with direct state update
   const handleLike = async (messageId) => {
     try {
-      await likeMessage(messageId);
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
-          msg._id === messageId ? { ...msg, likes: { ...msg.likes, up: (msg.likes.up || 0) + 1 } } : msg
-        )
-      );
+      const messageIndex = messages.findIndex((msg) => msg._id === messageId);
+      if (messageIndex === -1) return;
+  
+      const updatedMessages = [...messages];
+      const message = updatedMessages[messageIndex];
+  
+      if (message.userLiked) {
+        // Remove like
+        await dislikeMessage(messageId);
+        message.likes.up -= 1;
+        message.userLiked = false;
+      } else {
+        // If previously disliked, remove dislike first
+        if (message.userDisliked) {
+          message.likes.down -= 1;
+          message.userDisliked = false;
+        }
+        // Add like
+        await likeMessage(messageId);
+        message.likes.up += 1;
+        message.userLiked = true;
+      }
+  
+      setMessages(updatedMessages);
     } catch (error) {
       console.error("Failed to like message:", error);
     }
   };
-
-  // Updated dislike handler with direct state update
+  
   const handleDislike = async (messageId) => {
     try {
-      await dislikeMessage(messageId);
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
-          msg._id === messageId ? { ...msg, likes: { ...msg.likes, down: (msg.likes.down || 0) + 1 } } : msg
-        )
-      );
+      const messageIndex = messages.findIndex((msg) => msg._id === messageId);
+      if (messageIndex === -1) return;
+  
+      const updatedMessages = [...messages];
+      const message = updatedMessages[messageIndex];
+  
+      if (message.userDisliked) {
+        // Remove dislike
+        await likeMessage(messageId);
+        message.likes.down -= 1;
+        message.userDisliked = false;
+      } else {
+        // If previously liked, remove like first
+        if (message.userLiked) {
+          message.likes.up -= 1;
+          message.userLiked = false;
+        }
+        // Add dislike
+        await dislikeMessage(messageId);
+        message.likes.down += 1;
+        message.userDisliked = true;
+      }
+  
+      setMessages(updatedMessages);
     } catch (error) {
       console.error("Failed to dislike message:", error);
     }
   };
+  
+  
 
   const handleNewPost = () => {
     if (!newMessage.trim()) return;
@@ -163,14 +207,23 @@ export default function Channel() {
                 </div>
                 <div className="flex justify-between items-center text-sm text-gray-500 mt-auto">
                   <div className="flex space-x-4">
-                    <button onClick={() => handleLike(msg._id)} className="flex items-center space-x-1 text-green-600 hover:text-green-700">
+                  <button 
+                      onClick={() => handleLike(msg._id)}
+                      className={`flex items-center space-x-1 ${msg.userLiked ? "text-green-600" : "text-gray-500 hover:text-green-600"}`}
+                    >
                       <ThumbsUp size={16} />
                       <span>{msg.likes?.up || 0}</span>
                     </button>
-                    <button onClick={() => handleDislike(msg._id)} className="flex items-center space-x-1 text-red-600 hover:text-red-700">
+
+                    <button 
+                      onClick={() => handleDislike(msg._id)}
+                      className={`flex items-center space-x-1 ${msg.userDisliked ? "text-red-600" : "text-gray-500 hover:text-red-600"}`}
+                    >
                       <ThumbsDown size={16} />
                       <span>{msg.likes?.down || 0}</span>
                     </button>
+
+
                   </div>
                   <Link to={`/thread/${msg._id}`} className="flex items-center space-x-1 text-blue-500 hover:text-blue-600">
                     <MessageCircle size={16} />
