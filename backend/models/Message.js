@@ -1,23 +1,24 @@
 const db = require('../config/db');
 
 class Message {
-    static async create({ channel_id, user_id, content }) {
-        const messageDoc = {
-            _id: `message:${Date.now()}`,
-            type: "message",
-            channel_id,
-            user_id,
-            content,
-            created_at: new Date().toISOString(),
-            likes: { 
-                up: 0, 
-                down: 0,
-                users_liked: [],
-                users_disliked: []
-            }
-        };
-        return await db.messages.insert(messageDoc);
-    }
+  static async create({ channel_id, user_id, content, image }) {
+    const messageDoc = {
+        _id: `message:${Date.now()}`,
+        type: "message",
+        channel_id,
+        user_id,
+        content,
+        image: image || null, // Store the image filename if provided
+        created_at: new Date().toISOString(),
+        likes: { 
+            up: 0, 
+            down: 0,
+            users_liked: [],
+            users_disliked: []
+        }
+    };
+    return await db.messages.insert(messageDoc);
+}
 
     static async findByChannel(channel_id) {
         try {
@@ -119,73 +120,68 @@ class Message {
     }
 
     static async getMessageById(message_id) {
-        try {
-            const message = await db.messages.get(message_id);
-            
-            // Fetch replies for this message
-            const replies = await db.messages.find({
-                selector: { 
-                    type: "reply", 
-                    message_id: message_id 
-                }
-            });
+      try {
+          const message = await db.messages.get(message_id);
+          
+          const replies = await db.messages.find({
+              selector: { 
+                  type: "reply", 
+                  message_id: message_id 
+              }
+          });
 
-            // Organize replies recursively
-            const organizeReplies = (parentId) => 
-                replies.docs
-                    .filter(reply => reply.parent_id === parentId)
-                    .map(reply => ({
-                        ...reply,
-                        replies: organizeReplies(reply._id)
-                    }));
+          const organizeReplies = (parentId) => 
+              replies.docs
+                  .filter(reply => reply.parent_id === parentId)
+                  .map(reply => ({
+                      ...reply,
+                      replies: organizeReplies(reply._id)
+                  }));
 
-            // Attach organized replies to the message
-            return {
-                ...message,
-                replies: organizeReplies(message._id)
-            };
-        } catch (error) {
-            console.error('Error retrieving message:', error);
-            throw error;
-        }
+          return {
+              ...message,
+              replies: organizeReplies(message._id),
+              image: message.image ? `/uploads/${message.image}` : null // Return image URL
+          };
+      } catch (error) {
+          console.error('Error retrieving message:', error);
+          throw error;
+      }
+  }
+
+  static async getAllMessagesInChannel(channel_id) {
+    try {
+        const messages = await db.messages.find({ 
+            selector: { 
+                type: "message", 
+                channel_id 
+            } 
+        });
+
+        const replies = await db.messages.find({ 
+            selector: { 
+                type: "reply" 
+            } 
+        });
+
+        const organizeReplies = (parentId) => 
+            replies.docs
+                .filter(reply => reply.parent_id === parentId)
+                .map(reply => ({
+                    ...reply,
+                    replies: organizeReplies(reply._id)
+                }));
+
+        return messages.docs.map(message => ({
+            ...message,
+            replies: organizeReplies(message._id),
+            image: message.image ? `/uploads/${message.image}` : null // Return image URL
+        }));
+    } catch (error) {
+        console.error('Error retrieving messages:', error);
+        return [];
     }
-
-    static async getAllMessagesInChannel(channel_id) {
-        try {
-            // Fetch all messages in the channel
-            const messages = await db.messages.find({ 
-                selector: { 
-                    type: "message", 
-                    channel_id 
-                } 
-            });
-
-            // Fetch all replies
-            const replies = await db.messages.find({ 
-                selector: { 
-                    type: "reply" 
-                } 
-            });
-
-            // Organize replies recursively
-            const organizeReplies = (parentId) => 
-                replies.docs
-                    .filter(reply => reply.parent_id === parentId)
-                    .map(reply => ({
-                        ...reply,
-                        replies: organizeReplies(reply._id)
-                    }));
-
-            // Attach replies to their respective messages
-            return messages.docs.map(message => ({
-                ...message,
-                replies: organizeReplies(message._id)
-            }));
-        } catch (error) {
-            console.error('Error retrieving messages:', error);
-            return [];
-        }
-    }
+}
 }
 
 module.exports = Message;

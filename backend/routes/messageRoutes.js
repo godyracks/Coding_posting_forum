@@ -1,24 +1,22 @@
 const express = require('express');
-const { 
-  postMessage, 
-  getMessageById, 
-  getAllMessages, 
-  likeMessage, 
-  dislikeMessage 
+const {
+    postMessage,
+    getMessageById,
+    getAllMessages,
+    likeMessage,
+    dislikeMessage
 } = require('../controllers/messageController');
 const authMiddleware = require('../middleware/authMiddleware');
-const multer = require('multer');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
-// ✅ Route to fetch all messages
+// Fetch all messages
 router.get('/', authMiddleware, getAllMessages);
 
-// Route to post a message with an optional image
-router.post('/', authMiddleware, upload.single('image'), postMessage);
+// Post a message with an optional image
+router.post('/', authMiddleware, postMessage); // Multer is applied in the controller
 
-// Route to retrieve a message with attachments
+// Retrieve a message
 router.get('/:message_id', authMiddleware, getMessageById);
 
 // Like a message

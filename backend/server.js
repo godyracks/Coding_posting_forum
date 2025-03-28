@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const nano = require('nano')(process.env.COUCHDB_URL); // CouchDB Connection
+const path = require('path'); // Added for static file serving
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -16,6 +17,9 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 app.use(morgan('dev')); // Logs requests
+
+// Serve static files from the uploads folder
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Test CouchDB Connection
 (async () => {
