@@ -13,11 +13,21 @@ const Login = () => {
     try {
       const res = await axios.post("http://localhost:5000/api/auth/login", { email, password });
       console.log("Login response:", res.data); // Debug the response
+      
+      // Store token, email, userId, and role in localStorage
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("userEmail", email);
-      localStorage.setItem("userId", res.data.userId); // Store userId from response
+      localStorage.setItem("userId", res.data.userId);
+      localStorage.setItem("role", res.data.role || "user"); // Fallback to "user" if role is missing
+      
       setError("");
-      navigate("/profile");
+
+      // Redirect based on role
+      if (res.data.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/profile");
+      }
     } catch (error) {
       console.error("Login failed:", error.response?.data || error.message);
       setError(error.response?.data?.error || "Login failed. Please try again.");

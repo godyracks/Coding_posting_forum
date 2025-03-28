@@ -10,8 +10,8 @@ const Admin = () => {
   const token = localStorage.getItem('token');
   const navigate = useNavigate();
 
-  // Base URL for your backend (update this after hosting)
-  const API_URL = 'https://your-backend.onrender.com'; // Replace with your Render URL
+  // Base URL for local development
+  const API_URL = 'http://localhost:5000'; // Update this for production
 
   useEffect(() => {
     if (!token) {
@@ -62,6 +62,25 @@ const Admin = () => {
     }
   };
 
+  const handleBlock = async (id, currentBlockStatus) => {
+    try {
+      const newBlockStatus = currentBlockStatus ? 0 : 1; // Toggle block status
+      await axios.put(
+        `${API_URL}/api/users/admin/block-user/${id}`,
+        { is_blocked: newBlockStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Update user state to reflect new block status
+      setUsers(users.map((u) =>
+        u._id === id ? { ...u, is_blocked: newBlockStatus } : u
+      ));
+      setError('');
+    } catch (err) {
+      console.error('Error updating block status:', err);
+      setError(`Failed to update block status. ${err.response?.data?.error || 'Server error'}`);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gray-100 min-h-screen">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Admin Panel</h1>
@@ -81,15 +100,30 @@ const Admin = () => {
               >
                 <div>
                   <p className="font-medium text-gray-800">{user.name}</p>
-                  <p className="text-sm text-gray-600">{user.email} | Role: {user.role}</p>
+                  <p className="text-sm text-gray-600">
+                    {user.email} | Role: {user.role} | Status: {user.is_blocked ? 'Blocked' : 'Active'}
+                  </p>
                 </div>
-                <button
-                  onClick={() => handleDelete('user', user._id)}
-                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
-                  disabled={user.role === 'admin'} // Prevent deleting admin
-                >
-                  Delete
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleBlock(user._id, user.is_blocked)}
+                    className={`px-4 py-2 rounded text-white transition-colors ${
+                      user.is_blocked
+                        ? 'bg-green-500 hover:bg-green-600'
+                        : 'bg-yellow-500 hover:bg-yellow-600'
+                    }`}
+                    disabled={user.role === 'admin'} // Prevent blocking admin
+                  >
+                    {user.is_blocked ? 'Unblock' : 'Block'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete('user', user._id)}
+                    className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+                    disabled={user.role === 'admin'} // Prevent deleting admin
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>

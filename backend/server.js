@@ -4,6 +4,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const nano = require('nano')(process.env.COUCHDB_URL); // CouchDB Connection
 const path = require('path'); // Added for static file serving
+const User = require('./models/User'); // Import User model
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -27,6 +28,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
         const dbInfo = await nano.db.list();
         console.log('✅ Connected to CouchDB successfully!');
         console.log('📂 Existing Databases:', dbInfo);
+        await User.ensureAdmin(); // Add this line to create admin
     } catch (error) {
         console.error('❌ CouchDB connection failed:', error.message);
         process.exit(1); // Exit if DB connection fails

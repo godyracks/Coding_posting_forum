@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const bcrypt = require('bcryptjs');
 
 class User {
     // Create a new user
@@ -62,7 +63,6 @@ class User {
                 console.error(`❌ User not found: ${id}`);
                 return null;
             }
-
             user.is_blocked = is_blocked;
             return await db.insert(user);
         } catch (error) {
@@ -71,7 +71,7 @@ class User {
         }
     }
 
-    // New method: Update user name and status
+    // Update user name and status
     static async update(id, { name, status }) {
         try {
             const user = await db.get(id);
@@ -79,13 +79,38 @@ class User {
                 console.error(`❌ User not found: ${id}`);
                 return null;
             }
-
-            user.name = name || user.name; // Only update if provided
-            user.status = status || user.status; // Only update if provided
-            return await db.insert(user); // Update in database
+            user.name = name || user.name;
+            user.status = status || user.status;
+            return await db.insert(user);
         } catch (error) {
             console.error(`❌ Error updating user ${id}:`, error.message);
             throw new Error("Database error: Unable to update user");
+        }
+    }
+
+    // Ensure hardcoded admin exists
+    static async ensureAdmin() {
+        try {
+            const adminEmail = 'admin@email.com';
+            const admin = await User.findByEmail(adminEmail);
+            if (!admin) {
+                const password = 'admin123';
+                const salt = await bcrypt.genSalt(10);
+                const password_hash = await bcrypt.hash(password, salt);
+
+                await User.create({
+                    name: 'System Admin',
+                    email: adminEmail,
+                    password_hash,
+                    role: 'admin', // Only difference from default user
+                    status: 'beginner' // Same default as normal users
+                });
+                console.log('✅ Hardcoded admin created with email: admin@email.com');
+            } else {
+                console.log('✅ Admin already exists');
+            }
+        } catch (error) {
+            console.error('❌ Error ensuring admin:', error.message);
         }
     }
 }
