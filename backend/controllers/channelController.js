@@ -21,4 +21,13 @@ exports.getAllChannels = async (req, res) => {
         console.error('Error fetching channels:', error);
         res.status(500).json({ error: 'Error fetching channels' });
     }
+    exports.searchChannels = async (req, res) => {
+        try {
+          const { query } = req.query;
+          const channels = await Channel.searchByName(query);
+          res.json(channels);
+        } catch (error) {
+          res.status(500).json({ error: "Error searching channels" });
+        }
+      };
 };

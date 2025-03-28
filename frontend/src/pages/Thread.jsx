@@ -170,7 +170,7 @@ export default function Thread() {
         parent_id: parentId,
         user: { name: "You", status: "unknown" }, // Placeholder, update with actual user data if available
         content: replyContent,
-        imageUrl: res.data.image || null,
+        imageUrl: res.data.image ? `/uploads/${res.data.image}` : null, // Match controller format
         created_at: new Date().toISOString(),
         likes: { up: 0, down: 0 },
         liked_by: [],
@@ -231,11 +231,13 @@ export default function Thread() {
               </div>
               <p className="text-gray-800 mb-3">{reply.content}</p>
               {reply.imageUrl && (
-                <img
-                  src={`http://localhost:5000${reply.imageUrl}`}
-                  alt="Reply attachment"
-                  className="max-w-md w-full h-auto rounded-lg mb-3 object-cover"
-                />
+                <div className="relative overflow-hidden rounded-lg shadow-md border border-gray-200 mb-3 hover:shadow-lg transition-shadow duration-300">
+                  <img
+                    src={`http://localhost:5000${reply.imageUrl}`}
+                    alt="Reply attachment"
+                    className="max-w-md w-full h-auto object-cover transition-transform duration-300 hover:scale-105"
+                  />
+                </div>
               )}
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 <button
@@ -303,7 +305,7 @@ export default function Thread() {
                   <div className="flex space-x-2">
                     <button
                       type="submit"
-                      className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm"
+                      className="bg-blue-500 text-black px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm"
                     >
                       Post Reply
                     </button>
@@ -353,11 +355,13 @@ export default function Thread() {
         </div>
         <h1 className="text-xl font-semibold text-gray-800 mb-3">{thread.content}</h1>
         {thread.imageUrl && (
-          <img
-            src={`http://localhost:5000${thread.imageUrl}`}
-            alt="Message attachment"
-            className="max-w-md w-full h-auto rounded-lg mb-3 object-cover"
-          />
+          <div className="relative overflow-hidden rounded-lg shadow-md border border-gray-200 mb-3 hover:shadow-lg transition-shadow duration-300">
+            <img
+              src={`http://localhost:5000${thread.imageUrl}`}
+              alt="Message attachment"
+              className="max-w-md w-full h-auto object-cover transition-transform duration-300 hover:scale-105"
+            />
+          </div>
         )}
         <div className="flex items-center space-x-4 text-sm text-gray-600">
           <button
@@ -392,7 +396,10 @@ export default function Thread() {
         )}
       </div>
 
-      <form onSubmit={(e) => handleReply(e, messageId)} className="mt-8 bg-white border border-gray-200 rounded-lg p-6">
+      <form
+        onSubmit={(e) => handleReply(e, messageId)}
+        className="mt-8 bg-white border border-gray-200 rounded-lg p-6"
+      >
         <h3 className="text-md font-semibold text-gray-700 mb-4">Post a Reply</h3>
         <div className="relative">
           <textarea
@@ -417,7 +424,7 @@ export default function Thread() {
         />
         <button
           type="submit"
-          className="mt-3 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm"
+          className="mt-3 bg-blue-500 text-black px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm"
         >
           Post Reply
         </button>

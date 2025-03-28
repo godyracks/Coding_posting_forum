@@ -245,7 +245,7 @@ export default function Channel() {
             </div>
             <button
               type="submit"
-              className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 text-black p-2 rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Send size={20} />
             </button>

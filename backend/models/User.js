@@ -15,7 +15,7 @@ class User {
                 is_blocked: 0,
                 created_at: new Date().toISOString()
             };
-            return await db.insert(userDoc); // ✅ Insert into the 'project' database
+            return await db.insert(userDoc);
         } catch (error) {
             console.error("❌ Error creating user:", error.message);
             throw new Error("Database error: Unable to create user");
@@ -68,6 +68,24 @@ class User {
         } catch (error) {
             console.error(`❌ Error updating block status for user ${id}:`, error.message);
             return null;
+        }
+    }
+
+    // New method: Update user name and status
+    static async update(id, { name, status }) {
+        try {
+            const user = await db.get(id);
+            if (!user) {
+                console.error(`❌ User not found: ${id}`);
+                return null;
+            }
+
+            user.name = name || user.name; // Only update if provided
+            user.status = status || user.status; // Only update if provided
+            return await db.insert(user); // Update in database
+        } catch (error) {
+            console.error(`❌ Error updating user ${id}:`, error.message);
+            throw new Error("Database error: Unable to update user");
         }
     }
 }
