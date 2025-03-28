@@ -1,15 +1,19 @@
 const express = require('express');
-const { replyToMessage, getReplyById } = require('../controllers/replyController'); // ✅ Correct path
+const { replyToMessage, getReplyById, likeReply, dislikeReply } = require('../controllers/replyController');
 const authMiddleware = require('../middleware/authMiddleware');
-const multer = require('multer');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
-// Reply to a message OR another reply (nested replies)
-router.post('/', authMiddleware, upload.single('image'), replyToMessage);
+// Reply to a message OR another reply
+router.post('/', authMiddleware, replyToMessage);
 
 // Get a reply by ID
 router.get('/:reply_id', authMiddleware, getReplyById);
+
+// Like a reply
+router.post('/:id/like', authMiddleware, likeReply);
+
+// Dislike a reply
+router.post('/:id/dislike', authMiddleware, dislikeReply);
 
 module.exports = router;

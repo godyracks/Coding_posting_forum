@@ -1,69 +1,66 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
-import { 
-  ArrowLeft, 
-  ThumbsUp, 
-  ThumbsDown, 
-  MessageSquareReply, 
+import {
+  ArrowLeft,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquareReply,
   Clock,
   ChevronDown,
   ChevronUp,
-  Camera
+  Camera,
 } from "lucide-react";
+import { likeMessage, dislikeMessage } from "../services/likeService";
 
 export default function Thread() {
   const { messageId } = useParams();
   const [thread, setThread] = useState(null);
   const [loading, setLoading] = useState(true);
   const [replyContent, setReplyContent] = useState("");
+  const [replyImage, setReplyImage] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [expandedReplies, setExpandedReplies] = useState({});
   const token = localStorage.getItem("token");
+  const userId = localStorage.getItem("userId");
+  const fileInputRef = useRef(null);
+  const replyFileInputRefs = useRef({});
 
-   // Fetch the message and its replies
-   useEffect(() => {
+  useEffect(() => {
     const fetchMessageAndReplies = async () => {
       try {
-        // Fetch all messages
         const response = await axios.get("http://localhost:5000/api/messages/", {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        // Find the specific message by its ID
         const message = response.data.find((msg) => msg._id === messageId);
-
         if (!message) {
           console.error("Message not found");
           setLoading(false);
           return;
         }
 
-        // Flatten the nested replies structure
         const flattenReplies = (replies) => {
           let flatReplies = [];
           replies.forEach((reply) => {
-            flatReplies.push(reply); // Add the current reply
+            flatReplies.push({
+              ...reply,
+              userLiked: reply.liked_by?.includes(userId) || false,
+              userDisliked: reply.disliked_by?.includes(userId) || false,
+            });
             if (reply.replies && reply.replies.length > 0) {
-              flatReplies = flatReplies.concat(flattenReplies(reply.replies)); // Recursively flatten nested replies
+              flatReplies = flatReplies.concat(flattenReplies(reply.replies));
             }
           });
           return flatReplies;
         };
 
-        // Flatten the replies array
         const updatedReplies = flattenReplies(message.replies || []);
-
-        // Ensure all replies have a `likes` object
-        const repliesWithLikes = updatedReplies.map((reply) => ({
-          ...reply,
-          likes: reply.likes || { up: 0, down: 0 },
-        }));
-
-        // Update state with the message and its replies
         setThread({
           ...message,
-          replies: repliesWithLikes,
+          userLiked: message.liked_by?.includes(userId) || false,
+          userDisliked: message.disliked_by?.includes(userId) || false,
+          replies: updatedReplies,
         });
 
         setLoading(false);
@@ -74,142 +71,254 @@ export default function Thread() {
     };
 
     fetchMessageAndReplies();
-  }, [messageId]);
- // Handle posting a new reply
- const handleReply = async (parentId = messageId) => {
-  if (!replyContent.trim()) return;
+  }, [messageId, token, userId]);
 
-  try {
-    const res = await axios.post(
-      "http://localhost:5000/api/replies/",
-      {
-        message_id: messageId, // ✅ Always reference the original message
-        parent_id: parentId,   // ✅ Associate reply with the message or another reply
-        content: replyContent,
-        likes: { up: 0, down: 0 }, // ✅ Initialize likes object
-      },
-      {
-        headers: { Authorization: `Bearer ${token}` },
+  const handleLike = async (id, isReply = false) => {
+    try {
+      const url = isReply
+        ? `http://localhost:5000/api/replies/${id}/like`
+        : `http://localhost:5000/api/messages/${id}/like`;
+      const updatedItems = isReply ? thread.replies : [thread];
+      const itemIndex = updatedItems.findIndex((item) => item._id === id);
+      if (itemIndex === -1) return;
+
+      const updatedItemsCopy = [...updatedItems];
+      const item = updatedItemsCopy[itemIndex];
+
+      if (item.userLiked) {
+        await axios.post(url, {}, { headers: { Authorization: `Bearer ${token}` } });
+        item.likes.up -= 1;
+        item.userLiked = false;
+      } else {
+        if (item.userDisliked) {
+          item.likes.down -= 1;
+          item.userDisliked = false;
+        }
+        await axios.post(url, {}, { headers: { Authorization: `Bearer ${token}` } });
+        item.likes.up += 1;
+        item.userLiked = true;
       }
-    );
 
-    const newReply = {
-      _id: res.data.replyId,
-      parent_id: parentId, // ✅ Ensures replies stay linked properly
-      content: replyContent,
-      created_at: new Date().toISOString(),
-      likes: { up: 0, down: 0 }, // ✅ Ensure likes are included
-    };
+      if (isReply) {
+        setThread((prev) => ({ ...prev, replies: updatedItemsCopy }));
+      } else {
+        setThread((prev) => ({ ...prev, ...updatedItemsCopy[0] }));
+      }
+    } catch (error) {
+      console.error(`Failed to like ${isReply ? "reply" : "message"}:`, error);
+    }
+  };
 
-    // ✅ Update UI immediately
-    setThread((prev) => ({
-      ...prev,
-      replies: [...(prev.replies || []), newReply],
-    }));
+  const handleDislike = async (id, isReply = false) => {
+    try {
+      const url = isReply
+        ? `http://localhost:5000/api/replies/${id}/dislike`
+        : `http://localhost:5000/api/messages/${id}/dislike`;
+      const updatedItems = isReply ? thread.replies : [thread];
+      const itemIndex = updatedItems.findIndex((item) => item._id === id);
+      if (itemIndex === -1) return;
 
-    setReplyContent(""); // ✅ Clear input after sending reply
-    setReplyingTo(null); // ✅ Reset replyingTo state
-  } catch (error) {
-    console.error("❌ Error posting reply:", error);
-  }
-};
-  // Toggle nested replies expansion
+      const updatedItemsCopy = [...updatedItems];
+      const item = updatedItemsCopy[itemIndex];
+
+      if (item.userDisliked) {
+        await axios.post(url, {}, { headers: { Authorization: `Bearer ${token}` } });
+        item.likes.down -= 1;
+        item.userDisliked = false;
+      } else {
+        if (item.userLiked) {
+          item.likes.up -= 1;
+          item.userLiked = false;
+        }
+        await axios.post(url, {}, { headers: { Authorization: `Bearer ${token}` } });
+        item.likes.down += 1;
+        item.userDisliked = true;
+      }
+
+      if (isReply) {
+        setThread((prev) => ({ ...prev, replies: updatedItemsCopy }));
+      } else {
+        setThread((prev) => ({ ...prev, ...updatedItemsCopy[0] }));
+      }
+    } catch (error) {
+      console.error(`Failed to dislike ${isReply ? "reply" : "message"}:`, error);
+    }
+  };
+
+  const handleReply = async (e, parentId = messageId) => {
+    e.preventDefault();
+    if (!replyContent.trim() && !replyImage) return;
+
+    const formData = new FormData();
+    formData.append("message_id", messageId);
+    formData.append("parent_id", parentId);
+    formData.append("content", replyContent);
+    if (replyImage) {
+      formData.append("image", replyImage);
+    }
+
+    try {
+      const res = await axios.post("http://localhost:5000/api/replies/", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const newReply = {
+        _id: res.data.replyId,
+        parent_id: parentId,
+        user: { name: "You", status: "unknown" }, // Placeholder, update with actual user data if available
+        content: replyContent,
+        imageUrl: res.data.image || null,
+        created_at: new Date().toISOString(),
+        likes: { up: 0, down: 0 },
+        liked_by: [],
+        disliked_by: [],
+        userLiked: false,
+        userDisliked: false,
+      };
+
+      setThread((prev) => ({
+        ...prev,
+        replies: [...(prev.replies || []), newReply],
+      }));
+
+      setReplyContent("");
+      setReplyImage(null);
+      setReplyingTo(null);
+      if (parentId === messageId) {
+        fileInputRef.current.value = "";
+      } else {
+        replyFileInputRefs.current[parentId].value = "";
+      }
+    } catch (error) {
+      console.error("❌ Error posting reply:", error);
+    }
+  };
+
   const toggleRepliesExpansion = (replyId) => {
-    setExpandedReplies(prev => ({
+    setExpandedReplies((prev) => ({
       ...prev,
-      [replyId]: !prev[replyId]
+      [replyId]: !prev[replyId],
     }));
   };
 
-  // Recursive function to render replies with proper indentation
   const renderReplies = (replies, parentId = messageId, level = 0) => {
     return replies
       .filter((reply) => reply.parent_id === parentId)
       .map((reply) => {
-        // Count the number of nested replies
-        const nestedRepliesCount = replies.filter(
-          (r) => r.parent_id === reply._id
-        ).length;
+        const nestedRepliesCount = replies.filter((r) => r.parent_id === reply._id).length;
 
         return (
-          <div 
-            key={reply._id} 
-            style={{ marginLeft: `${level * 20}px` }} 
-            className="mt-3 transition-all duration-300 ease-in-out"
+          <div
+            key={reply._id}
+            style={{ marginLeft: `${level * 24}px` }}
+            className="mt-4 transition-all duration-300 ease-in-out"
           >
-            <div className="border-l-4 border-blue-300 pl-4 bg-blue-50 p-3 rounded-lg shadow-sm hover:shadow-md">
-              {/* Reply Content */}
-              <p className="text-gray-800 mb-2">{reply.content}</p>
-              <div className="flex items-center text-gray-500 text-sm mb-2">
-                <Clock className="w-4 h-4 mr-2" />
-                {new Date(reply.created_at).toLocaleString()}
+            <div className="border-l-4 border-blue-400 pl-4 bg-blue-50 p-4 rounded-lg shadow-sm hover:shadow-md">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-700">{reply.user.name}</span>
+                  <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
+                    {reply.user.status}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500 flex items-center">
+                  <Clock className="w-4 h-4 mr-1" />
+                  {new Date(reply.created_at).toLocaleString()}
+                </span>
               </div>
-
-              {/* Like/Dislike Buttons */}
-              <div className="flex space-x-4 mb-2">
-                <button className="flex items-center text-green-600 hover:text-green-700">
-                  <ThumbsUp className="w-5 h-5 mr-1" />
+              <p className="text-gray-800 mb-3">{reply.content}</p>
+              {reply.imageUrl && (
+                <img
+                  src={`http://localhost:5000${reply.imageUrl}`}
+                  alt="Reply attachment"
+                  className="max-w-md w-full h-auto rounded-lg mb-3 object-cover"
+                />
+              )}
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <button
+                  onClick={() => handleLike(reply._id, true)}
+                  className={`flex items-center ${
+                    reply.userLiked ? "text-green-600" : "hover:text-green-600"
+                  }`}
+                >
+                  <ThumbsUp className="w-4 h-4 mr-1" />
                   {reply.likes?.up || 0}
                 </button>
-                <button className="flex items-center text-red-600 hover:text-red-700">
-                  <ThumbsDown className="w-5 h-5 mr-1" />
+                <button
+                  onClick={() => handleDislike(reply._id, true)}
+                  className={`flex items-center ${
+                    reply.userDisliked ? "text-red-600" : "hover:text-red-600"
+                  }`}
+                >
+                  <ThumbsDown className="w-4 h-4 mr-1" />
                   {reply.likes?.down || 0}
                 </button>
-              </div>
-
-              {/* Reply to Reply Button */}
-              <button
-                onClick={() => setReplyingTo(reply._id)}
-                className="flex items-center text-blue-500 text-sm hover:text-blue-600 mr-4"
-              >
-                <MessageSquareReply className="w-4 h-4 mr-1" />
-                Reply
-              </button>
-
-              {/* Nested Replies Count with Expand/Collapse */}
-              {nestedRepliesCount > 0 && (
                 <button
-                  onClick={() => toggleRepliesExpansion(reply._id)}
-                  className="flex items-center text-gray-500 text-sm hover:text-blue-600"
+                  onClick={() => setReplyingTo(reply._id)}
+                  className="flex items-center text-blue-500 hover:text-blue-700"
                 >
-                  {expandedReplies[reply._id] ? (
-                    <ChevronUp className="w-4 h-4 mr-1" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 mr-1" />
-                  )}
-                  {nestedRepliesCount} {nestedRepliesCount === 1 ? "reply" : "replies"}
+                  <MessageSquareReply className="w-4 h-4 mr-1" />
+                  Reply
                 </button>
-              )}
-
-              {/* Nested Reply Form */}
+                {nestedRepliesCount > 0 && (
+                  <button
+                    onClick={() => toggleRepliesExpansion(reply._id)}
+                    className="flex items-center text-gray-500 hover:text-blue-600"
+                  >
+                    {expandedReplies[reply._id] ? (
+                      <ChevronUp className="w-4 h-4 mr-1" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 mr-1" />
+                    )}
+                    {nestedRepliesCount} {nestedRepliesCount === 1 ? "Reply" : "Replies"}
+                  </button>
+                )}
+              </div>
               {replyingTo === reply._id && (
-                <div className="mt-4 space-y-2 relative">
+                <form onSubmit={(e) => handleReply(e, reply._id)} className="mt-4 space-y-3">
                   <div className="relative">
                     <textarea
-                      className="w-full border border-gray-300 p-2 pl-10 rounded-md focus:ring-2 focus:ring-blue-200 transition-all"
-                      placeholder="Type your reply..."
+                      className="w-full border border-gray-300 p-3 pl-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm resize-none"
+                      placeholder="Write a reply..."
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
-                    ></textarea>
-                    <Camera 
-                      className="absolute left-3 top-3 text-gray-400" 
-                      size={20} 
+                      rows={3}
+                    />
+                    <Camera
+                      className="absolute left-3 top-3 text-gray-400 hover:text-gray-600 cursor-pointer"
+                      size={20}
+                      onClick={() => replyFileInputRefs.current[reply._id]?.click()}
                     />
                   </div>
-                  <button
-                    onClick={() => handleReply(reply._id)}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                  >
-                    Reply
-                  </button>
-                </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={(el) => (replyFileInputRefs.current[reply._id] = el)}
+                    onChange={(e) => setReplyImage(e.target.files[0])}
+                    className="hidden"
+                  />
+                  <div className="flex space-x-2">
+                    <button
+                      type="submit"
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm"
+                    >
+                      Post Reply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReplyingTo(null)}
+                      className="text-gray-500 hover:text-gray-700 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               )}
-
-              {/* Recursively render nested replies (only if expanded) */}
               {nestedRepliesCount > 0 && expandedReplies[reply._id] && (
-                <div className="mt-2">
-                  {renderReplies(replies, reply._id, level + 1)}
-                </div>
+                <div className="mt-4">{renderReplies(replies, reply._id, level + 1)}</div>
               )}
             </div>
           </div>
@@ -217,78 +326,102 @@ export default function Thread() {
       });
   };
 
-  if (loading) return <p className="text-center mt-10">Loading...</p>;
-
-  if (!thread) return <p className="text-center mt-10 text-red-500">Message not found.</p>;
+  if (loading) return <p className="text-center mt-10 text-gray-500">Loading...</p>;
+  if (!thread) return <p className="text-center mt-10 text-red-500">Thread not found.</p>;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-xl">
-      {/* Back Button */}
-      <Link 
-        to={`/channel/${thread.channel_id}`} 
-        className="flex items-center text-blue-500 hover:text-blue-600 mb-4"
-      >
-        <ArrowLeft className="w-5 h-5 mr-2" />
-        Back to Channel
-      </Link>
-
-      {/* Main Message */}
-      <div className="p-4 border border-gray-200 rounded-lg shadow-sm bg-white">
-        <h1 className="text-xl font-bold text-gray-800 mb-2">{thread.content}</h1>
-        <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-          <p>Posted by: {thread.user_id}</p>
-          <div className="flex items-center">
-            <Clock className="w-4 h-4 mr-2" />
-            {new Date(thread.created_at).toLocaleString()}
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 mb-6">
+        <Link
+          to={`/channel/${thread.channel_id}`}
+          className="flex items-center text-blue-500 hover:text-blue-600 mb-4 text-sm"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Channel
+        </Link>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-gray-700">{thread.user.name}</span>
+            <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
+              {thread.user.status}
+            </span>
           </div>
+          <span className="text-xs text-gray-500 flex items-center">
+            <Clock className="w-4 h-4 mr-1" />
+            {new Date(thread.created_at).toLocaleString()}
+          </span>
         </div>
-
-        {/* Like/Dislike Buttons */}
-        <div className="flex space-x-4 mt-2">
-          <button className="flex items-center text-green-600 hover:text-green-700">
-            <ThumbsUp className="w-5 h-5 mr-1" />
+        <h1 className="text-xl font-semibold text-gray-800 mb-3">{thread.content}</h1>
+        {thread.imageUrl && (
+          <img
+            src={`http://localhost:5000${thread.imageUrl}`}
+            alt="Message attachment"
+            className="max-w-md w-full h-auto rounded-lg mb-3 object-cover"
+          />
+        )}
+        <div className="flex items-center space-x-4 text-sm text-gray-600">
+          <button
+            onClick={() => handleLike(thread._id)}
+            className={`flex items-center ${
+              thread.userLiked ? "text-green-600" : "hover:text-green-600"
+            }`}
+          >
+            <ThumbsUp className="w-4 h-4 mr-1" />
             {thread.likes?.up || 0}
           </button>
-          <button className="flex items-center text-red-600 hover:text-red-700">
-            <ThumbsDown className="w-5 h-5 mr-1" />
+          <button
+            onClick={() => handleDislike(thread._id)}
+            className={`flex items-center ${
+              thread.userDisliked ? "text-red-600" : "hover:text-red-600"
+            }`}
+          >
+            <ThumbsDown className="w-4 h-4 mr-1" />
             {thread.likes?.down || 0}
           </button>
         </div>
       </div>
 
-      {/* Replies Section */}
       <div className="mt-6">
-        <h2 className="text-lg font-semibold mb-4 text-gray-700">Replies:</h2>
-
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">
+          Replies ({thread.replies?.length || 0})
+        </h2>
         {thread.replies && thread.replies.length > 0 ? (
           renderReplies(thread.replies)
         ) : (
-          <p className="text-gray-500 italic">No replies yet. Be the first to reply!</p>
+          <p className="text-gray-500 italic text-sm">No replies yet. Be the first to reply!</p>
         )}
       </div>
 
-      {/* Main Reply Form */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <h2 className="text-lg font-semibold mb-4 text-gray-700">Add a Reply</h2>
+      <form onSubmit={(e) => handleReply(e, messageId)} className="mt-8 bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="text-md font-semibold text-gray-700 mb-4">Post a Reply</h3>
         <div className="relative">
           <textarea
-            className="w-full border border-gray-300 p-3 pl-10 rounded-md focus:ring-2 focus:ring-blue-200 transition-all mb-3"
-            placeholder="Type your reply..."
+            className="w-full border border-gray-300 p-3 pl-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm resize-none"
+            placeholder="Write your reply..."
             value={replyContent}
             onChange={(e) => setReplyContent(e.target.value)}
-          ></textarea>
-          <Camera 
-            className="absolute left-3 top-3 text-gray-400" 
-            size={20} 
+            rows={3}
+          />
+          <Camera
+            className="absolute left-3 top-3 text-gray-400 hover:text-gray-600 cursor-pointer"
+            size={20}
+            onClick={() => fileInputRef.current?.click()}
           />
         </div>
+        <input
+          type="file"
+          accept="image/*"
+          ref={fileInputRef}
+          onChange={(e) => setReplyImage(e.target.files[0])}
+          className="hidden"
+        />
         <button
-          onClick={() => handleReply(messageId)}
-          className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          type="submit"
+          className="mt-3 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm"
         >
-          Reply
+          Post Reply
         </button>
-      </div>
+      </form>
     </div>
   );
 }

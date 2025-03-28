@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { likeMessage, dislikeMessage } from "../services/likeService";
@@ -19,8 +19,10 @@ export default function Channel() {
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const [imageFile, setImageFile] = useState(null); // New state for image file
+  const [imageFile, setImageFile] = useState(null);
   const token = localStorage.getItem("token");
+  const userId = localStorage.getItem("userId"); // This might be null
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     axios
@@ -29,12 +31,11 @@ export default function Channel() {
       })
       .then((res) => setChannels(res.data))
       .catch((err) => console.error("Error fetching channels:", err));
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (channelId) {
       fetchMessages();
-      // Set selected channel based on channelId
       const channel = channels.find((ch) => ch._id === channelId);
       setSelectedChannel(channel);
     }
@@ -46,11 +47,13 @@ export default function Channel() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const updatedMessages = res.data.map((msg) => ({
-        ...msg,
-        userLiked: msg.liked_by?.includes(localStorage.getItem("userId")) || false,
-        userDisliked: msg.disliked_by?.includes(localStorage.getItem("userId")) || false,
-      }));
+      const updatedMessages = res.data
+        .filter((msg) => msg.channel_id === channelId)
+        .map((msg) => ({
+          ...msg,
+          userLiked: msg.liked_by?.includes(userId) || false,
+          userDisliked: msg.disliked_by?.includes(userId) || false,
+        }));
 
       setMessages(updatedMessages);
     } catch (err) {
@@ -67,17 +70,14 @@ export default function Channel() {
       const message = updatedMessages[messageIndex];
 
       if (message.userLiked) {
-        // Remove like
         await dislikeMessage(messageId);
         message.likes.up -= 1;
         message.userLiked = false;
       } else {
-        // If previously disliked, remove dislike first
         if (message.userDisliked) {
           message.likes.down -= 1;
           message.userDisliked = false;
         }
-        // Add like
         await likeMessage(messageId);
         message.likes.up += 1;
         message.userLiked = true;
@@ -98,17 +98,14 @@ export default function Channel() {
       const message = updatedMessages[messageIndex];
 
       if (message.userDisliked) {
-        // Remove dislike
         await likeMessage(messageId);
         message.likes.down -= 1;
         message.userDisliked = false;
       } else {
-        // If previously liked, remove like first
         if (message.userLiked) {
           message.likes.up -= 1;
           message.userLiked = false;
         }
-        // Add dislike
         await dislikeMessage(messageId);
         message.likes.down += 1;
         message.userDisliked = true;
@@ -121,150 +118,203 @@ export default function Channel() {
   };
 
   const handleNewPost = async (e) => {
-    e.preventDefault(); // Prevent form submission default behavior
-    if (!newMessage.trim() && !imageFile) return; // Require either text or image
+    e.preventDefault();
+    if (!newMessage.trim() && !imageFile) return;
 
     const formData = new FormData();
     formData.append("channel_id", channelId);
     formData.append("content", newMessage);
     if (imageFile) {
-      formData.append("image", imageFile); // Append image file if present
+      formData.append("image", imageFile);
     }
 
     try {
+      // Post the new message
       const res = await axios.post("http://localhost:5000/api/messages/", formData, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data", // Required for file uploads
+          "Content-Type": "multipart/form-data",
         },
       });
 
-      const newMsg = {
-        _id: res.data.messageId,
-        user_id: localStorage.getItem("userId") || "You", // Adjust based on your auth setup
+      // Create a temporary new message object with fallback user data
+      const tempNewMsg = {
+        _id: res.data.messageId || `temp-${Date.now()}`, // Fallback ID if not provided
+        user: { name: "You", status: "active" }, // Fallback until user fetch
+        channel_id: channelId,
         content: newMessage,
         created_at: new Date().toISOString(),
         likes: { up: 0, down: 0 },
         liked_by: [],
         disliked_by: [],
         replies: [],
-        imageUrl: res.data.image || null, // Use the returned image URL
+        imageUrl: res.data.image ? `/uploads/${res.data.image}` : null,
         userLiked: false,
         userDisliked: false,
       };
- Ascendants.push(newMsg); // Add to messages list
-      setMessages((prevMessages) => [...prevMessages, newMsg]);
+
+      // Optimistically update the UI
+      setMessages((prevMessages) => [tempNewMsg, ...prevMessages]);
+
+      // Clear inputs immediately
       setNewMessage("");
-      setImageFile(null); // Reset image input
+      setImageFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      // Fetch user details if userId is available
+      let userData = { name: "You", status: "active" };
+      if (userId) {
+        try {
+          const userRes = await axios.get(`http://localhost:5000/api/users/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          userData = {
+            name: userRes.data.username || "You",
+            status: userRes.data.status || "active",
+          };
+        } catch (userErr) {
+          console.warn("Failed to fetch user data:", userErr.response?.data || userErr.message);
+        }
+      } else {
+        console.warn("userId is null; using fallback user data.");
+      }
+
+      // Update the message with fetched user data (optional, since fetchMessages will override)
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg._id === tempNewMsg._id ? { ...msg, user: userData } : msg
+        )
+      );
+
+      // Sync with server
+      await fetchMessages();
     } catch (err) {
-      console.error("Error posting message:", err);
+      console.error("Error posting message:", err.response?.data || err.message);
+    }
+  };
+
+  const handleImageClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-100">
       {/* Channel Header */}
-      <div className="bg-white border-b border-gray-300 p-4 shadow-md flex justify-between items-center">
-        <Link to="/channels" className="text-blue-500 font-semibold">
+      <div className="bg-white border-b border-gray-200 p-4 shadow-sm flex justify-between items-center">
+        <Link to="/channels" className="text-blue-600 font-medium hover:text-blue-800">
           <ArrowLeft className="inline-block mr-2" /> Back
         </Link>
-        <h1 className="text-xl font-bold">
+        <h1 className="text-xl font-semibold text-gray-800">
           <MessageCircle className="inline-block mr-2" />
           {selectedChannel ? selectedChannel.name : "Loading..."}
         </h1>
       </div>
 
       {/* New Post Input */}
-      <form onSubmit={handleNewPost} className="bg-white p-4 border-b border-gray-300 shadow-md flex items-center space-x-4">
-        <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
-          <User className="text-gray-600" />
-        </div>
-        <div className="flex-1 flex flex-col space-y-2">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Write a new post..."
-              className="w-full p-3 pl-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <Camera
-              size={20}
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-            />
+      <form onSubmit={handleNewPost} className="bg-white p-4 border-b border-gray-200 shadow-sm">
+        <div className="flex items-center space-x-4 max-w-3xl mx-auto">
+          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+            <User className="text-gray-600" />
           </div>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImageFile(e.target.files[0])}
-            className="text-sm text-gray-500"
-          />
-          <button
-            type="submit"
-            className="bg-black text-white p-3 rounded-full hover:bg-gray-800 transition-colors self-end"
-          >
-            <Send size={20} />
-          </button>
+          <div className="flex-1 flex items-center space-x-3">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Write a new post..."
+                className="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Camera
+                size={20}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer hover:text-gray-700"
+                onClick={handleImageClick}
+              />
+              <input
+                id="imageInput"
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={(e) => setImageFile(e.target.files[0])}
+                className="hidden"
+              />
+            </div>
+            <button
+              type="submit"
+              className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Send size={20} />
+            </button>
+          </div>
         </div>
       </form>
 
       {/* Messages List */}
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-6 overflow-y-auto bg-gray-100">
         {messages.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6 max-w-6xl mx-auto">
+          <div className="max-w-3xl mx-auto space-y-4">
             {messages.map((msg) => (
               <div
                 key={msg._id}
-                className="bg-white shadow-lg rounded-xl p-6 w-full flex flex-col justify-between hover:shadow-xl transition-all duration-300"
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
               >
-                <div>
-                  <div className="flex items-center space-x-4 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                      <User className="text-gray-600" />
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                      <User className="text-gray-600" size={16} />
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">{msg.user_id}</p>
-                      <p className="text-sm text-gray-500 flex items-center">
-                        <Clock className="mr-2" size={16} />
-                        {new Date(msg.created_at).toLocaleTimeString()}
-                      </p>
-                    </div>
+                    <span className="text-sm font-medium text-gray-700">{msg.user.name}</span>
+                    <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
+                      {msg.user.status}
+                    </span>
                   </div>
-                  <p className="text-gray-900 mb-4">{msg.content}</p>
-                  {msg.imageUrl && (
-                    <img
-                      src={`http://localhost:5000${msg.imageUrl}`}
-                      alt="Message attachment"
-                      className="max-w-full h-auto rounded-lg mb-4"
-                    />
-                  )}
+                  <span className="text-xs text-gray-500 flex items-center">
+                    <Clock className="w-4 h-4 mr-1" />
+                    {new Date(msg.created_at).toLocaleString()}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center text-sm text-gray-500 mt-auto">
+                <p className="text-gray-700 mb-3 text-sm">{msg.content}</p>
+                {msg.imageUrl && (
+                  <img
+                    src={`http://localhost:5000${msg.imageUrl}`}
+                    alt="Message attachment"
+                    className="w-full h-64 object-cover rounded-md mb-3"
+                  />
+                )}
+                <div className="flex justify-between items-center text-xs text-gray-600 border-t border-gray-200 pt-2">
                   <div className="flex space-x-4">
                     <button
                       onClick={() => handleLike(msg._id)}
                       className={`flex items-center space-x-1 ${
-                        msg.userLiked ? "text-green-600" : "text-gray-500 hover:text-green-600"
+                        msg.userLiked
+                          ? "text-blue-600"
+                          : "text-gray-600 hover:text-blue-600"
                       }`}
                     >
-                      <ThumbsUp size={16} />
+                      <ThumbsUp size={14} />
                       <span>{msg.likes?.up || 0}</span>
                     </button>
                     <button
                       onClick={() => handleDislike(msg._id)}
                       className={`flex items-center space-x-1 ${
-                        msg.userDisliked ? "text-red-600" : "text-gray-500 hover:text-red-600"
+                        msg.userDisliked
+                          ? "text-red-600"
+                          : "text-gray-600 hover:text-red-600"
                       }`}
                     >
-                      <ThumbsDown size={16} />
+                      <ThumbsDown size={14} />
                       <span>{msg.likes?.down || 0}</span>
                     </button>
                   </div>
                   <Link
                     to={`/thread/${msg._id}`}
-                    className="flex items-center space-x-1 text-blue-500 hover:text-blue-600"
+                    className="flex items-center space-x-1 text-blue-600 hover:text-blue-800"
                   >
-                    <MessageCircle size={16} />
+                    <MessageCircle size={14} />
                     <span>{msg.replies.length} Replies</span>
                   </Link>
                 </div>
@@ -272,7 +322,7 @@ export default function Channel() {
             ))}
           </div>
         ) : (
-          <p className="text-gray-500 text-center">No messages in this channel yet.</p>
+          <p className="text-gray-500 text-center mt-10">No messages in this channel yet.</p>
         )}
       </div>
     </div>

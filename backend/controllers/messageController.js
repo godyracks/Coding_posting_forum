@@ -64,22 +64,51 @@ exports.postMessage = [
 ];
 
 // Retrieve a single message
-exports.getMessageById = async (req, res) => {
+// Assuming you're using a database like MongoDB or SQL with a users table
+exports.getMessages = async (req, res) => {
     try {
-        const { message_id } = req.params;
-        const message = await db.get(message_id);
-
-        // Add image URL to response if image exists
-        if (message.image) {
-            message.imageUrl = `/uploads/${message.image}`;
-        }
-
-        res.json(message);
+      const messages = await db.getAllMessages(); // Replace with your actual DB query
+      const updatedMessages = await Promise.all(
+        messages.map(async (message) => {
+          // Fetch user details (e.g., from a users collection/table)
+          const user = await db.getUserById(message.user_id); // Adjust based on your DB structure
+          return {
+            ...message,
+            user: {
+              name: user.username || message.user_id, // Fallback to user_id if username not found
+              status: user.status || "active", // Default to "active" if no status
+            },
+            imageUrl: message.image ? `/uploads/${message.image}` : null,
+          };
+        })
+      );
+      res.json(updatedMessages);
     } catch (error) {
-        console.error("❌ Error fetching message:", error.message);
-        res.status(404).json({ error: "Message not found" });
+      console.error("❌ Error fetching messages:", error.message);
+      res.status(500).json({ error: "Failed to fetch messages" });
     }
-};
+  };
+  
+  // Example for getMessageById (for consistency)
+  exports.getMessageById = async (req, res) => {
+    try {
+      const { message_id } = req.params;
+      const message = await db.get(message_id);
+      const user = await db.getUserById(message.user_id); // Fetch user details
+      const updatedMessage = {
+        ...message,
+        user: {
+          name: user.username || message.user_id,
+          status: user.status || "active",
+        },
+        imageUrl: message.image ? `/uploads/${message.image}` : null,
+      };
+      res.json(updatedMessage);
+    } catch (error) {
+      console.error("❌ Error fetching message:", error.message);
+      res.status(404).json({ error: "Message not found" });
+    }
+  };
 
 // Fetch all messages with nested replies
 exports.getAllMessages = async (req, res) => {
@@ -90,18 +119,29 @@ exports.getAllMessages = async (req, res) => {
         // Fetch all replies
         const replies = await db.find({ selector: { type: "reply" } });
 
+        // Fetch all users
+        const users = await db.find({ selector: { type: "user" } });
+
+        // Create a map of user_id to { name, status }
+        const userMap = users.docs.reduce((map, user) => {
+            map[user._id] = { name: user.name, status: user.status };
+            return map;
+        }, {});
+
         // Function to organize replies recursively
         const organizeReplies = (parentId) =>
             replies.docs
                 .filter(reply => reply.parent_id === parentId)
                 .map(reply => ({
                     ...reply,
+                    user: userMap[reply.user_id] || { name: reply.user_id, status: "unknown" }, // Embed user data
                     replies: organizeReplies(reply._id) // Recursively fetch nested replies
                 }));
 
-        // Attach replies and image URLs to their respective messages
+        // Attach replies, user data, and image URLs to their respective messages
         const messagesWithReplies = messages.docs.map(message => ({
             ...message,
+            user: userMap[message.user_id] || { name: message.user_id, status: "unknown" }, // Embed user data
             replies: organizeReplies(message._id),
             imageUrl: message.image ? `/uploads/${message.image}` : null // Add image URL
         }));
