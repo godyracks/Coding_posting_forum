@@ -5,7 +5,8 @@ const {
     getAllMessages,
     likeMessage,
     dislikeMessage,
-    deleteMessage
+    deleteMessage,
+    searchMessages
 } = require('../controllers/messageController');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -29,5 +30,8 @@ router.post('/:id/dislike', authMiddleware, dislikeMessage);
 
 // Delete a message (admin only)
 router.delete('/admin/:id', authMiddleware, roleMiddleware, deleteMessage);
+
+// Search messages
+router.get('/search', authMiddleware, searchMessages);
 
 module.exports = router;

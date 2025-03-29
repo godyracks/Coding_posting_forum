@@ -1,23 +1,16 @@
 const express = require('express');
-const { blockUser, getAllUsers, getUserById, updateUser, deleteUser } = require('../controllers/userController');
+const { registerUser, loginUser, getAllUsers, deleteUser, blockUser, getUserStats, getUserById } = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
-// Admin only: Block/Unblock users
-router.put('/admin/block-user/:id', authMiddleware, roleMiddleware, blockUser);
-
-// Admin only: Delete user
+router.post('/register', registerUser);
+router.post('/login', loginUser);
+router.get('/', authMiddleware, roleMiddleware, getAllUsers);
 router.delete('/admin/:id', authMiddleware, roleMiddleware, deleteUser);
-
-// Get all users
-router.get('/', authMiddleware, getAllUsers);
-
-// Get a single user by ID
-router.get('/:id', authMiddleware, getUserById);
-
-// Update user profile
-router.put('/:id', authMiddleware, updateUser);
+router.put('/admin/block-user/:id', authMiddleware, roleMiddleware, blockUser);
+router.get('/stats', authMiddleware, getUserStats);
+router.get('/:id', authMiddleware, getUserById); // Add this route
 
 module.exports = router;

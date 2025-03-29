@@ -187,6 +187,39 @@ class Message {
             throw new Error("Database error: Unable to delete message");
         }
     }
+
+    // New method: Search messages by content
+    static async searchByContent(query) {
+      try {
+          const messages = await db.find({
+              selector: { type: { $in: ["message", "reply"] } }
+          });
+          if (!query) return messages.docs || [];
+          return messages.docs.filter(msg =>
+              msg.content.toLowerCase().includes(query.toLowerCase())
+          ) || [];
+      } catch (error) {
+          console.error('Error searching messages by content:', error.message);
+          return [];
+      }
+  }
+
+  // New method: Search messages by user_id
+  static async searchByUser(user_id) {
+      try {
+          const messages = await db.find({
+              selector: {
+                  type: { $in: ["message", "reply"] },
+                  user_id
+              }
+          });
+          return messages.docs;
+      } catch (error) {
+          console.error('Error searching messages by user:', error);
+          return [];
+      }
+  }
+
 }
 
 module.exports = Message;

@@ -1,32 +1,25 @@
 const db = require('../config/db');
 const multer = require('multer');
 const path = require('path');
-const Message = require('../models/Message'); // Import Message model
+const Message = require('../models/Message');
 
-// Multer storage setup (save to uploads folder)
 const storage = multer.diskStorage({
     destination: './uploads/',
-    filename: (req, file, cb) => {
-        cb(null, `${Date.now()}-${file.originalname}`);
-    }
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
 
 const upload = multer({
-    storage: storage,
+    storage,
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const filetypes = /jpeg|jpg|png|gif/;
         const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
         const mimetype = filetypes.test(file.mimetype);
-        if (extname && mimetype) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only images are allowed!'));
-        }
+        if (extname && mimetype) cb(null, true);
+        else cb(new Error('Only images are allowed!'));
     }
 });
 
-// Create a new message with optional image upload
 exports.postMessage = [
     upload.single('image'),
     async (req, res) => {
@@ -51,7 +44,6 @@ exports.postMessage = [
 
             const createdMessage = await db.insert(messageDoc);
             console.log("✅ Message created:", createdMessage);
-
             res.status(201).json({
                 message: "Message posted successfully!",
                 messageId,
@@ -64,7 +56,6 @@ exports.postMessage = [
     }
 ];
 
-// Fetch all messages with nested replies
 exports.getAllMessages = async (req, res) => {
     try {
         const messages = await db.find({ selector: { type: "message" } });
@@ -89,7 +80,7 @@ exports.getAllMessages = async (req, res) => {
             ...message,
             user: userMap[message.user_id] || { name: message.user_id, status: "unknown" },
             replies: organizeReplies(message._id),
-            imageUrl: message.image ? `/uploads/${message.image}` : null
+            imageUrl: message.image ? `/uploads/${message.image}` : null // Fixed typo from 'image.image'
         }));
 
         res.json(messagesWithReplies);
@@ -99,7 +90,6 @@ exports.getAllMessages = async (req, res) => {
     }
 };
 
-// Retrieve a single message
 exports.getMessageById = async (req, res) => {
     try {
         const { message_id } = req.params;
@@ -111,10 +101,7 @@ exports.getMessageById = async (req, res) => {
             return map;
         }, {});
 
-        const replies = await db.find({
-            selector: { type: "reply", message_id: message_id }
-        });
-
+        const replies = await db.find({ selector: { type: "reply", message_id } });
         const organizeReplies = (parentId) =>
             replies.docs
                 .filter(reply => reply.parent_id === parentId)
@@ -137,11 +124,9 @@ exports.getMessageById = async (req, res) => {
     }
 };
 
-// Helper function to update message likes
 const updateMessageLikes = async (messageId, userId, action) => {
     try {
         const doc = await db.get(messageId);
-
         doc.likes = doc.likes || { up: 0, down: 0 };
         doc.liked_by = doc.liked_by || [];
         doc.disliked_by = doc.disliked_by || [];
@@ -174,17 +159,12 @@ const updateMessageLikes = async (messageId, userId, action) => {
     }
 };
 
-// Like a message
 exports.likeMessage = async (req, res) => {
     try {
         const { id } = req.params;
         const user_id = req.user.id;
-
         const result = await updateMessageLikes(id, user_id, 'like');
-        if (!result.success) {
-            return res.status(500).json({ error: "Failed to like message", details: result.error });
-        }
-
+        if (!result.success) return res.status(500).json({ error: "Failed to like message", details: result.error });
         res.status(200).json({ message: "Message liked successfully", likes: result.likes });
     } catch (error) {
         console.error("Controller error liking message:", error);
@@ -192,17 +172,12 @@ exports.likeMessage = async (req, res) => {
     }
 };
 
-// Dislike a message
 exports.dislikeMessage = async (req, res) => {
     try {
         const { id } = req.params;
         const user_id = req.user.id;
-
         const result = await updateMessageLikes(id, user_id, 'dislike');
-        if (!result.success) {
-            return res.status(500).json({ error: "Failed to dislike message", details: result.error });
-        }
-
+        if (!result.success) return res.status(500).json({ error: "Failed to dislike message", details: result.error });
         res.status(200).json({ message: "Message disliked successfully", likes: result.likes });
     } catch (error) {
         console.error("Controller error disliking message:", error);
@@ -210,18 +185,60 @@ exports.dislikeMessage = async (req, res) => {
     }
 };
 
-// New method: Delete a message (admin only)
 exports.deleteMessage = async (req, res) => {
     const { id } = req.params;
-
     try {
         const result = await Message.delete(id);
-        if (!result) {
-            return res.status(404).json({ error: `Message with ID ${id} not found` });
-        }
+        if (!result) return res.status(404).json({ error: `Message with ID ${id} not found` });
         res.json({ message: `Message ${id} deleted successfully` });
     } catch (error) {
         console.error(`Error deleting message with ID ${id}:`, error);
         res.status(500).json({ error: 'Error deleting message' });
+    }
+};
+
+exports.searchMessages = async (req, res) => {
+    const { query, user_id } = req.query;
+
+    try {
+        let messages = [];
+        if (user_id) {
+            messages = await Message.searchByUser(user_id);
+        } else if (query) {
+            messages = await Message.searchByContent(query);
+        } else {
+            return res.status(400).json({ error: "Provide either 'query' or 'user_id' parameter" });
+        }
+
+        // If messages is null/undefined, default to empty array
+        if (!messages) messages = [];
+
+        const users = await db.find({ selector: { type: "user" } });
+        const userMap = users.docs.reduce((map, user) => {
+            map[user._id] = { name: user.name || user._id, status: user.status || "unknown" };
+            return map;
+        }, {});
+
+        const replies = await db.find({ selector: { type: "reply" } }) || { docs: [] };
+        const organizeReplies = (parentId) =>
+            replies.docs
+                .filter(reply => reply.parent_id === parentId)
+                .map(reply => ({
+                    ...reply,
+                    user: userMap[reply.user_id] || { name: reply.user_id, status: "unknown" },
+                    replies: organizeReplies(reply._id)
+                }));
+
+        const enrichedMessages = messages.map(message => ({
+            ...message,
+            user: userMap[message.user_id] || { name: message.user_id, status: "unknown" },
+            replies: organizeReplies(message._id),
+            imageUrl: message.image ? `/uploads/${message.image}` : null
+        }));
+
+        res.status(200).json(enrichedMessages); // Always return 200 with results (even if empty)
+    } catch (error) {
+        console.error("Error searching messages:", error.message);
+        res.status(500).json({ error: "Error searching messages", details: error.message });
     }
 };

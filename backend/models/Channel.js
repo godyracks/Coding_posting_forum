@@ -27,33 +27,29 @@ class Channel {
         }
     }
 
-    static async searchByName(query) {
-        try {
-            const channels = await db.find({
-                selector: {
-                    type: "channel",
-                    name: { $regex: new RegExp(query, 'i') } // Case-insensitive search
-                }
-            });
-            return channels.docs.length ? channels.docs : [];
-        } catch (error) {
-            console.error("❌ Error searching channels:", error.message);
-            return [];
-        }
-    }
-
-    // Ensure this delete method is present
     static async delete(id) {
         try {
             const channel = await db.get(id);
-            if (!channel) {
-                return null; // Channel not found
-            }
+            if (!channel) return null;
             await db.destroy(id, channel._rev);
-            return true; // Successfully deleted
+            return true;
         } catch (error) {
             console.error(`❌ Error deleting channel ${id}:`, error.message);
             throw new Error("Database error: Unable to delete channel");
+        }
+    }
+
+    // Updated: Avoid $regex, filter in memory instead
+    static async searchByName(query) {
+        try {
+            const channels = await db.find({ selector: { type: "channel" } });
+            if (!query) return channels.docs; // Return all if no query
+            return channels.docs.filter(channel =>
+                channel.name.toLowerCase().includes(query.toLowerCase())
+            );
+        } catch (error) {
+            console.error("❌ Error searching channels:", error.message);
+            return [];
         }
     }
 }
