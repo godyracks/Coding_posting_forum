@@ -107,7 +107,7 @@ const Admin = () => {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleBlock(user._id, user.is_blocked)}
-                    className={`px-4 py-2 rounded text-white transition-colors ${
+                    className={`px-4 py-2 rounded text-red transition-colors ${
                       user.is_blocked
                         ? 'bg-green-500 hover:bg-green-600'
                         : 'bg-yellow-500 hover:bg-yellow-600'
@@ -118,7 +118,7 @@ const Admin = () => {
                   </button>
                   <button
                     onClick={() => handleDelete('user', user._id)}
-                    className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+                    className="bg-red-500 text-blue px-4 py-2 rounded hover:bg-red-600 transition-colors"
                     disabled={user.role === 'admin'} // Prevent deleting admin
                   >
                     Delete
@@ -145,7 +145,7 @@ const Admin = () => {
                 <p className="font-medium text-gray-800">{channel.name}</p>
                 <button
                   onClick={() => handleDelete('channel', channel._id)}
-                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+                  className="bg-red-500 text-red px-4 py-2 rounded hover:bg-red-600 transition-colors"
                 >
                   Delete
                 </button>
@@ -177,7 +177,7 @@ const Admin = () => {
                 </div>
                 <button
                   onClick={() => handleDelete('message', message._id)}
-                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+                  className="bg-red-500 text-black px-4 py-2 rounded hover:bg-red-600 transition-colors"
                 >
                   Delete
                 </button>

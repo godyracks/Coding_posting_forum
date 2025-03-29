@@ -96,12 +96,12 @@ export default function Home() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <button type="submit" className="mt-2 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">
+        <button type="submit" className="mt-2 w-full bg-gray-600 text-black p-2 rounded-md hover:bg-blue-700">
           Search
         </button>
       </form>
 
-      <button onClick={handleCreateChannel} className="w-full max-w-md bg-blue-600 text-white p-3 rounded-md hover:bg-blue-700 flex items-center justify-center mb-8">
+      <button onClick={handleCreateChannel} className="w-full max-w-md bg-blue-600 text-black p-3 rounded-md hover:bg-blue-700 flex items-center justify-center mb-8">
         <Plus className="w-4 h-4 mr-2" />
         Create Channel
       </button>

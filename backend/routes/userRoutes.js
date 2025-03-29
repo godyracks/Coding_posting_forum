@@ -1,5 +1,5 @@
 const express = require('express');
-const { registerUser, loginUser, getAllUsers, deleteUser, blockUser, getUserStats, getUserById } = require('../controllers/userController');
+const { registerUser, loginUser, getAllUsers, deleteUser, blockUser, getUserStats, getUserById, updateUserProfile } = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
@@ -11,6 +11,7 @@ router.get('/', authMiddleware, roleMiddleware, getAllUsers);
 router.delete('/admin/:id', authMiddleware, roleMiddleware, deleteUser);
 router.put('/admin/block-user/:id', authMiddleware, roleMiddleware, blockUser);
 router.get('/stats', authMiddleware, getUserStats);
-router.get('/:id', authMiddleware, getUserById); // Add this route
+router.get('/:id', authMiddleware, getUserById); 
+router.put('/:id', authMiddleware, updateUserProfile);
 
 module.exports = router;

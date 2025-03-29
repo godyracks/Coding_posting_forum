@@ -15,9 +15,9 @@ exports.registerUser = async (req, res) => {
         const user = await User.create({
             name,
             email,
-            password: hashedPassword,
+            password_hash: hashedPassword,
             role: 'user',
-            status: 'active'
+            status: 'beginner' // Default status
         });
 
         const token = jwt.sign(
@@ -37,11 +37,11 @@ exports.loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await User.findByEmail(email);
-        if (!user || user.status === 'blocked') {
+        if (!user || user.is_blocked === 1) { // Check is_blocked instead of status
             return res.status(401).json({ error: 'Invalid credentials or user blocked' });
         }
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(password, user.password_hash); // Fix: password_hash, not password
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -72,7 +72,7 @@ exports.getAllUsers = async (req, res) => {
 exports.deleteUser = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await User.delete(id);
+        const result = await User.delete(id); // Note: You don’t have a delete method; adjust if needed
         if (!result) {
             return res.status(404).json({ error: `User with ID ${id} not found` });
         }
@@ -86,12 +86,10 @@ exports.deleteUser = async (req, res) => {
 exports.blockUser = async (req, res) => {
     const { id } = req.params;
     try {
-        const user = await User.findById(id);
-        if (!user) {
+        const result = await User.updateBlockStatus(id, 1); // Set is_blocked to 1
+        if (!result) {
             return res.status(404).json({ error: `User with ID ${id} not found` });
         }
-        user.status = 'blocked';
-        await User.update(user);
         res.json({ message: `User ${id} blocked successfully` });
     } catch (error) {
         console.error(`Error blocking user ${id}:`, error);
@@ -123,6 +121,7 @@ exports.getUserStats = async (req, res) => {
         res.status(500).json({ error: "Error fetching user stats" });
     }
 };
+
 exports.getUserById = async (req, res) => {
     const { id } = req.params;
     try {
@@ -130,12 +129,41 @@ exports.getUserById = async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: `User with ID ${id} not found` });
         }
-        // Remove sensitive data like password
-        const { password, ...userData } = user;
+        const { password_hash, ...userData } = user; // Fix: password_hash, not password
         res.json(userData);
     } catch (error) {
         console.error(`Error fetching user ${id}:`, error.message);
         res.status(500).json({ error: 'Error fetching user' });
+    }
+};
+
+exports.updateUserProfile = async (req, res) => {
+    const { id } = req.params;
+    const { name, status } = req.body;
+
+    try {
+        // Ensure the user can only update their own profile
+        if (req.user.id !== id) {
+            return res.status(403).json({ error: 'You can only update your own profile' });
+        }
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ error: `User with ID ${id} not found` });
+        }
+
+        // Update only allowed fields
+        const updatedUser = await User.update(id, { name, status });
+        if (!updatedUser) {
+            return res.status(404).json({ error: `User with ID ${id} not found` });
+        }
+
+        // Remove sensitive data before sending response
+        const { password_hash, ...userData } = updatedUser;
+        res.json({ message: 'Profile updated successfully', user: userData });
+    } catch (error) {
+        console.error(`Error updating profile for user ${id}:`, error.message);
+        res.status(500).json({ error: 'Error updating profile' });
     }
 };
 
